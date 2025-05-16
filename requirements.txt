@@ -1,7 +1,6 @@
 streamlit
-langchain==0.0.320
-langchain-openai
-openai
+langchain==0.1.17
+langchain-openai==0.1.2
+openai==1.23.2
 faiss-cpu
 pypdf
-protobuf==3.20.3
