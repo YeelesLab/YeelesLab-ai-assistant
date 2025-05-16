@@ -34,7 +34,8 @@ if uploaded_files:
                 all_texts.extend(texts)
 
         # Embed and store in Chroma
-        embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
+        from langchain_openai import OpenAIEmbeddings
+        embeddings = OpenAIEmbeddings()
         vectorstore = Chroma.from_documents(documents=all_texts, embedding=embeddings)
 
         # Retrieval-based QA chain
