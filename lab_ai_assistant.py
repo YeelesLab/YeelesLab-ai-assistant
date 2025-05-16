@@ -1,52 +1,48 @@
-# lab_ai_assistant.py
-
 import os
 import streamlit as st
-from langchain_openai import OpenAIEmbeddings
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.document_loaders import PyPDFLoader
-from langchain.chat_models import ChatOpenAI
-from langchain.chains import RetrievalQA
-from tempfile import NamedTemporaryFile
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import FAISS
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.chains import RetrievalQA
+from langchain.chat_models import ChatOpenAI
 
+# Load your OpenAI API key from environment variable
+openai_api_key = os.getenv("OPENAI_API_KEY")
+if not openai_api_key:
+    st.error("Missing OpenAI API key. Please add it to Streamlit secrets.")
+    st.stop()
 
-# Set OpenAI API key (or use st.secrets for Streamlit Cloud)
-openai_api_key = st.secrets["OPENAI_API_KEY"] if "OPENAI_API_KEY" in st.secrets else os.getenv("OPENAI_API_KEY")
+# UI
+st.title("🧬 Yeeles Lab AI Assistant")
+uploaded_file = st.file_uploader("Upload a PDF paper", type="pdf")
 
-st.set_page_config(page_title="Lab AI Assistant", layout="wide")
-st.title("🧠 Lab AI Research Assistant")
+if uploaded_file:
+    with st.spinner("Processing document..."):
+        loader = PyPDFLoader(uploaded_file.name)
+        pages = loader.load()
+        
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200
+        )
+        docs = text_splitter.split_documents(pages)
 
-uploaded_files = st.file_uploader("Upload one or more research papers (PDFs)", type=["pdf"], accept_multiple_files=True)
-query = st.text_input("Ask a question about the uploaded papers:")
+        # Embeddings & vectorstore
+        embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
+        vectorstore = FAISS.from_documents(docs, embeddings)
 
-if uploaded_files:
-    with st.spinner("Processing PDFs..."):
-        all_texts = []
+        # QA chain
+        retriever = vectorstore.as_retriever()
+        qa_chain = RetrievalQA.from_chain_type(
+            llm=ChatOpenAI(openai_api_key=openai_api_key),
+            chain_type="stuff",
+            retriever=retriever
+        )
 
-        for uploaded_file in uploaded_files:
-            with NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-                tmp_file.write(uploaded_file.read())
-                loader = PyPDFLoader(tmp_file.name)
-                pages = loader.load()
+    question = st.text_input("Ask a question about this paper:")
 
-                text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
-                texts = text_splitter.split_documents(pages)
-                all_texts.extend(texts)
-
-        # Embed and store in Chroma
-        embeddings = OpenAIEmbeddings()
-        vectorstore = FAISS.from_documents(all_texts, embeddings)
-
-        # Retrieval-based QA chain
-        llm = ChatOpenAI(temperature=0, openai_api_key=openai_api_key)
-        qa_chain = RetrievalQA.from_chain_type(llm=llm, retriever=vectorstore.as_retriever())
-
-        if query:
-            with st.spinner("Thinking..."):
-                answer = qa_chain.run(query)
-                st.subheader("Answer:")
-                st.write(answer)
-else:
-    st.info("Please upload at least one PDF to begin.")
+    if question:
+        with st.spinner("Thinking..."):
+            answer = qa_chain.run(question)
+            st.markdown(f"**Answer:** {answer}")
