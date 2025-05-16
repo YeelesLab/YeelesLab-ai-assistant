@@ -2,13 +2,15 @@
 
 import os
 import streamlit as st
+from langchain_openai import OpenAIEmbeddings
 from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import Chroma
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.document_loaders import PyPDFLoader
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import RetrievalQA
 from tempfile import NamedTemporaryFile
+from langchain.vectorstores import FAISS
+
 
 # Set OpenAI API key (or use st.secrets for Streamlit Cloud)
 openai_api_key = st.secrets["OPENAI_API_KEY"] if "OPENAI_API_KEY" in st.secrets else os.getenv("OPENAI_API_KEY")
@@ -34,9 +36,8 @@ if uploaded_files:
                 all_texts.extend(texts)
 
         # Embed and store in Chroma
-        from langchain_openai import OpenAIEmbeddings
         embeddings = OpenAIEmbeddings()
-        vectorstore = Chroma.from_documents(documents=all_texts, embedding=embeddings)
+        vectorstore = FAISS.from_documents(all_texts, embeddings)
 
         # Retrieval-based QA chain
         llm = ChatOpenAI(temperature=0, openai_api_key=openai_api_key)
