@@ -9,38 +9,37 @@ from langchain.embeddings import OpenAIEmbeddings
 from langchain.chains import RetrievalQA
 from langchain.chat_models import ChatOpenAI
 
-# Load API key from Streamlit secrets or environment
+# Safely fetch API key
 openai_api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
-
 if not openai_api_key:
-    st.error("❌ Missing OpenAI API key. Add it to `.env` or Streamlit Secrets.")
+    st.error("❌ Missing OpenAI API key.")
     st.stop()
 
-st.set_page_config(page_title="Yeeles Lab Assistant", page_icon="🧬")
+st.set_page_config(page_title="Yeeles Lab AI Assistant", page_icon="🧬")
 st.title("🧬 Yeeles Lab AI Assistant")
-st.write("Upload a research paper and ask questions about it.")
+st.write("Upload a research paper PDF and ask questions.")
 
-uploaded_file = st.file_uploader("Upload a PDF", type="pdf")
+uploaded_file = st.file_uploader("📄 Upload a PDF", type="pdf")
 
 if uploaded_file:
-    with st.spinner("🔍 Reading PDF..."):
-        # Save PDF temporarily
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-            tmp_file.write(uploaded_file.read())
-            tmp_path = tmp_file.name
+    with st.spinner("🔍 Reading and indexing PDF..."):
+        # Save uploaded file to a temp file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            tmp.write(uploaded_file.read())
+            tmp_path = tmp.name
 
-        # Load and split
+        # Load PDF content
         loader = PyPDFLoader(tmp_path)
         pages = loader.load()
 
+        # Split into chunks
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         docs = text_splitter.split_documents(pages)
 
-        # Embedding and vector store
+        # Embeddings
         embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
         vectorstore = FAISS.from_documents(docs, embeddings)
 
-        # Retrieval-based QA
         retriever = vectorstore.as_retriever()
         qa_chain = RetrievalQA.from_chain_type(
             llm=ChatOpenAI(openai_api_key=openai_api_key),
@@ -48,8 +47,8 @@ if uploaded_file:
             chain_type="stuff"
         )
 
-        # Ask a question
-        question = st.text_input("Ask a question about the paper:")
+        # Ask question
+        question = st.text_input("💬 Ask a question about the paper:")
 
         if question:
             with st.spinner("🤖 Generating answer..."):
